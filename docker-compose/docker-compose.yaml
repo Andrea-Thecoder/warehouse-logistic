@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  warehouse_optimization_db:
+    image: postgres:17.2
+    container_name: warehouse_optimization
+    ports:
+      - "5433:5432"
+    environment:
+      - POSTGRES_DB=warehouse_optimization
+      - POSTGRES_USER=warehouse
+      - POSTGRES_PASSWORD=optimization
+    volumes:
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+
