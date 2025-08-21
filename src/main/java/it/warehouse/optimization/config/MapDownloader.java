@@ -27,7 +27,7 @@ public class MapDownloader {
 
     @ConfigProperty(name = "warehouse.map.file-path", defaultValue = "data")
     String mapDir;
-//
+
     @ConfigProperty(name = "warehouse.map.file-name", defaultValue = "italy-latest.osm.pbf")
     String mapFileName;
 
