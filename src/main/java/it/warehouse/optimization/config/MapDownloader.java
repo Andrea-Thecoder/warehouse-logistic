@@ -1,8 +1,9 @@
 package it.warehouse.optimization.config;
 
+import io.quarkus.runtime.Startup;
+import it.warehouse.optimization.exception.ServiceException;
 import jakarta.annotation.PostConstruct;
 import jakarta.enterprise.context.ApplicationScoped;
-import io.quarkus.runtime.Startup;
 import lombok.extern.slf4j.Slf4j;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
@@ -41,20 +42,21 @@ public class MapDownloader {
     Integer connectionTimeout;
 
 
-    private  String osmUrl;
+    private String osmUrl;
     private Path filePath;
+    private Path tmpFilePath;
     private static final int CHUNK_SIZE = 16 * 1024;
 
 
     @PostConstruct
     public void init() {
 
-        osmUrl =  String.format("https://download.geofabrik.de/%s/%s-latest.osm.pbf",continent,country );
+        osmUrl = String.format("https://download.geofabrik.de/%s/%s-latest.osm.pbf", continent, country);
         filePath = Paths.get(mapDir, mapFileName);
+        tmpFilePath = Paths.get(mapDir, mapFileName + ".part");
+        if (checkFileExist()) return;
 
-        if(checkFileExist()) return;
-
-        if(!autoDownloadEnabled){
+        if (!autoDownloadEnabled) {
             log.warn("WARNING: Map auto download is disabled, make sure the file is downloaded!");
             return;
         }
@@ -62,15 +64,18 @@ public class MapDownloader {
         try {
             downloadIfNotExists();
         } catch (IOException e) {
-            log.error("MapDownloader - init: Error while download map file. Error message: {}",e.getMessage());
+            log.error("MapDownloader - init: Error while download map file. Error message: {}", e.getMessage());
+            cleanupTempFile();
             throw new RuntimeException("Error while download map file." + e.getMessage());
         } catch (InterruptedException e) {
             log.error("MapDownloader - init: Download interrupted", e);
+            cleanupTempFile();
+            Thread.currentThread().interrupt();
             throw new RuntimeException("Download interrupted", e);
         }
     }
 
-    private boolean checkFileExist(){
+    private boolean checkFileExist() {
         if (Files.exists(filePath)) {
             log.info("Map file already downloaded at: {}", filePath);
             return true;
@@ -88,7 +93,7 @@ public class MapDownloader {
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(osmUrl))
                 .build();
-        downloadWithProgress(client,request);
+        downloadWithProgress(client, request);
     }
 
     private void downloadWithProgress(HttpClient client, HttpRequest request) throws IOException, InterruptedException {
@@ -104,7 +109,7 @@ public class MapDownloader {
 
         log.info("Starting download of map file...");
         try (InputStream in = response.body();
-             var out = Files.newOutputStream(filePath, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
+             var out = Files.newOutputStream(tmpFilePath, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
 
             byte[] buffer = new byte[CHUNK_SIZE];
             long downloaded = 0;
@@ -123,11 +128,24 @@ public class MapDownloader {
                     }
                 }
             }
+            Files.move(tmpFilePath, filePath, StandardCopyOption.REPLACE_EXISTING);
+            log.info("Download complete.");
+        } catch (Exception e) {
+            cleanupTempFile();
+            throw new ServiceException(e.getMessage());
         }
-
-        log.info("Download complete: {}", filePath.toAbsolutePath());
     }
 
+    private void cleanupTempFile() {
+        try {
+            if (Files.exists(tmpFilePath)) {
+                Files.delete(tmpFilePath);
+                log.info("Deleted partial file: {}", tmpFilePath);
+            }
+        } catch (IOException ioException) {
+            log.warn("Could not delete partial file: {}", tmpFilePath);
+        }
+    }
 
 
 }

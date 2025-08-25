@@ -3,30 +3,42 @@ import requests
 import argparse
 
 OSM_URL = "https://download.geofabrik.de"
-CHUCK_SIZE = 16 * 1024
+CHUNK_SIZE = 16 * 1024
 
-def download_procedure(url,path,timeout):
-     with requests.get(url, stream=True, timeout=timeout) as r:
-        r.raise_for_status()
-        total_length = r.headers.get('content-length')
-        
-        if total_length is None:
-            with open(path, 'wb') as f:
-                f.write(r.content)
-        else:
-            total_length = int(total_length)
-            downloaded = 0
-            last_logged_percent = 0
-            with open(path, 'wb') as f:
-                for chunk in r.iter_content(chunk_size=CHUCK_SIZE):
-                    if chunk:
-                        f.write(chunk)
-                        downloaded += len(chunk)
-                        percent = int(downloaded / total_length * 100)
-                        if percent // 10 > last_logged_percent // 10:
-                            last_logged_percent = percent
-                            print(f"Download progress: {percent}%")
-
+def download_procedure(url, path, timeout):
+    tmp_path = path + ".part"  # file temporaneo
+    try:
+        with requests.get(url, stream=True, timeout=timeout) as r:
+            r.raise_for_status()
+            total_length = r.headers.get('content-length')
+            
+            if total_length is None:
+                with open(tmp_path, 'wb') as f:
+                    f.write(r.content)
+            else:
+                total_length = int(total_length)
+                downloaded = 0
+                last_logged_percent = 0
+                with open(tmp_path, 'wb') as f:
+                    for chunk in r.iter_content(chunk_size=CHUNK_SIZE):
+                        if chunk:
+                            f.write(chunk)
+                            downloaded += len(chunk)
+                            percent = int(downloaded / total_length * 100)
+                            if percent // 10 > last_logged_percent // 10:
+                                last_logged_percent = percent
+                                print(f"Download progress: {percent}%")
+        os.rename(tmp_path, path)
+        print("Download complete!")
+    except KeyboardInterrupt:
+        print("\nDownload interrotto manualmente.")
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
+    except Exception as e:
+        print("\nDownload fallito.")
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
+        raise
 
 def download_map(continent, country, directory, filename, timeout):
     if not filename:
@@ -44,8 +56,6 @@ def download_map(continent, country, directory, filename, timeout):
     print(f"Downloading {url} to {path} ...")
     
     download_procedure(url,path,timeout)
-   
-    print("Download complete!")
 
 
 if __name__ == "__main__":
