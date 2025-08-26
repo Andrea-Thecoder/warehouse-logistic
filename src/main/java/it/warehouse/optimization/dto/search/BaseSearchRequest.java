@@ -11,7 +11,7 @@ import org.apache.commons.lang3.StringUtils;
 @Getter
 @Setter
 
-public class BaseSearchRequest {
+public sealed class BaseSearchRequest permits SearchRequest,CitySearchRequest,MovementSearchRequest,ProductSearchRequest,StockSearchRequest,WarehouseSearchRequest{
     @QueryParam("page")
     @DefaultValue("1")
     @Min(1)

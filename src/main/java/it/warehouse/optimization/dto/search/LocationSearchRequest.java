@@ -11,14 +11,15 @@ import org.apache.commons.lang3.StringUtils;
 @Setter
 @NoArgsConstructor
 
-public class LocationSearchRequest extends  SearchRequest{
+public final class LocationSearchRequest extends SearchRequest {
 
-    public <T> void filterBuilder(ExpressionList<T> query){
-        if (StringUtils.isNotBlank(search)){
+
+    public <T> void filterBuilder(ExpressionList<T> query) {
+        if (StringUtils.isNotBlank(search)) {
             String searchPattern = "%" + search.trim() + "%";
             query.or()
-                    .ilike("name",searchPattern)
-                    .ilike("istat_code",searchPattern)
+                    .ilike("name", searchPattern)
+                    .ilike("istat_code", searchPattern)
                     .endOr();
         }
     }

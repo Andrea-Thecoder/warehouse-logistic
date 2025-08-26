@@ -8,5 +8,5 @@ import lombok.Setter;
 @Getter
 @Setter
 
-public class DetailMovementTrackDTO extends BaseDetailMovementTrackDTO {
+public final class DetailMovementTrackDTO extends BaseDetailMovementTrackDTO {
 }

@@ -15,7 +15,7 @@ import org.apache.commons.lang3.StringUtils;
 @AllArgsConstructor
 @NoArgsConstructor
 
-public class WarehouseSearchRequest  extends  BaseSearchRequest{
+public final class WarehouseSearchRequest  extends  BaseSearchRequest{
 
     @QueryParam("name")
     private String warehouseName;

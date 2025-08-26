@@ -16,11 +16,11 @@ import java.util.UUID;
 
 public class BaseDetailProductDTO {
 
-    private UUID id;
-    private String name;
-    private Double volume;
-    private Double weight;
-    private CategoryType category;
+    protected UUID id;
+    protected String name;
+    protected Double volume;
+    protected Double weight;
+    protected CategoryType category;
 
     public static BaseDetailProductDTO of (Product product){
         BaseDetailProductDTO dto = new BaseDetailProductDTO();

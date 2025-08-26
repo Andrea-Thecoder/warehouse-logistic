@@ -2,7 +2,6 @@ package it.warehouse.optimization.dto.search;
 
 
 import io.ebean.ExpressionList;
-import io.quarkus.rest.client.reactive.ClientQueryParams;
 import jakarta.ws.rs.QueryParam;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -15,20 +14,21 @@ import org.apache.commons.lang3.StringUtils;
 @AllArgsConstructor
 @NoArgsConstructor
 
-public final class ProductSearchRequest extends  BaseSearchRequest{
+public sealed class StockSearchRequest extends  BaseSearchRequest permits AdvancedStockSearchRequest  {
 
-    @QueryParam("name")
-    private String productName;
 
-    @QueryParam("category")
-    private String categoryId;
+    @QueryParam("product")
+    protected String productName;
+
+    @QueryParam("warehouse")
+    protected String warehouseName;
 
     public <T> void filterBuilder(ExpressionList<T> query){
         if(StringUtils.isNotBlank(productName)){
-            query.ilike("name","%"+productName.trim()+"%");
+            query.ilike("product.name","%"+productName.trim()+"%");
         }
-        if(StringUtils.isNotBlank(categoryId)){
-            query.ieq("category.id",productName.trim());
+        if(StringUtils.isNotBlank(warehouseName)){
+            query.ilike("warehouse.name","%"+warehouseName.trim()+"%");
         }
     }
 

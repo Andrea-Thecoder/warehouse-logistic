@@ -13,7 +13,7 @@ import org.apache.commons.lang3.StringUtils;
 @AllArgsConstructor
 @NoArgsConstructor
 
-public class MovementSearchRequest extends  BaseSearchRequest{
+public final class MovementSearchRequest extends  BaseSearchRequest{
 
     @QueryParam("search")
     private String search;

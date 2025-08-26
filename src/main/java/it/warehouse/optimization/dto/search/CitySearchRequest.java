@@ -14,7 +14,7 @@ import org.apache.commons.lang3.StringUtils;
 @AllArgsConstructor
 @NoArgsConstructor
 
-public class CitySearchRequest  extends  BaseSearchRequest{
+public final class CitySearchRequest  extends  BaseSearchRequest{
 
     @QueryParam("city")
     private String cityName;

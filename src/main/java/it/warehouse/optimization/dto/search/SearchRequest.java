@@ -13,13 +13,12 @@ import org.apache.commons.lang3.StringUtils;
 @AllArgsConstructor
 @NoArgsConstructor
 
-public class SearchRequest  extends BaseSearchRequest{
+public sealed class SearchRequest  extends BaseSearchRequest permits  LocationSearchRequest{
 
     @QueryParam("search")
     protected String search;
 
     public <T> void filterBuilder(ExpressionList<T> query, String searchColumn ){
-
         if (StringUtils.isNotBlank(search)){
             query.ilike(searchColumn,"% " + search.trim() +" %");
         }

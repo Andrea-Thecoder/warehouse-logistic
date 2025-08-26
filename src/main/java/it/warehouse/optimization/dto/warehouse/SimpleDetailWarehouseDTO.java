@@ -13,7 +13,7 @@ import java.util.UUID;
 @AllArgsConstructor
 @NoArgsConstructor
 
-public class SimpleDetailWarehouseDTO {
+public  class SimpleDetailWarehouseDTO  {
 
     protected UUID id;
     protected String name;

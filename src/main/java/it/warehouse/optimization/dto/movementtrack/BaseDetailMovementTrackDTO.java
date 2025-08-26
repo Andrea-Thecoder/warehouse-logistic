@@ -20,7 +20,7 @@ import java.util.UUID;
 @AllArgsConstructor
 @NoArgsConstructor
 
-public class BaseDetailMovementTrackDTO {
+public sealed class BaseDetailMovementTrackDTO permits  DetailMovementTrackDTO {
 
 
     protected UUID id;
