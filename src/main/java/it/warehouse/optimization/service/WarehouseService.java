@@ -59,7 +59,8 @@ public class WarehouseService {
 
     public void updateWarehouseCapacityNoTransaction(UUID warehouseId, int quantity){
         Warehouse warehouse = getWarehouseByIdOrThrow(warehouseId);
-        warehouse.setVolumeCapacity(warehouse.);
+
+        warehouse.setVolumeCapacity();
     }
 
     public Warehouse getWarehouseByIdOrThrow (UUID id){
