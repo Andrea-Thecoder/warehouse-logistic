@@ -26,8 +26,14 @@ public class Warehouse extends  AbstractAuditable{
     @Column(nullable = false)
     private Double volumeCapacity;
 
+    @Column
+    private Double availableVolume;
+
     @Column(nullable = false)
     private Double weightCapacity;
+
+    @Column
+    private Double availableWeight;
 
     @ManyToOne
     @JoinColumn(name = "city_id", nullable = false)

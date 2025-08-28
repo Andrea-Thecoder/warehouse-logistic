@@ -14,6 +14,7 @@ import it.warehouse.optimization.exception.ServiceException;
 import it.warehouse.optimization.model.Product;
 import it.warehouse.optimization.model.Stock;
 import it.warehouse.optimization.model.Warehouse;
+import it.warehouse.optimization.model.enumerator.StockAction;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
@@ -35,9 +36,6 @@ public class StockService {
     @Inject
     ProductService productService;
 
-    private static final String INCOMING = "INCOMING";
-    private static final String OUTGOING = "OUTGOING";
-
 
     public Long createStock(InsertStockDTO dto) {
         log.info("createStock: Starting creating new Stock track for product id: {}", dto.getProductId());
@@ -46,7 +44,7 @@ public class StockService {
             Warehouse warehouse = warehouseService.getWarehouseByIdOrThrow(dto.getWarehouseId());
             Product product = productService.getProductByIdOrThrow(dto.getProductId());
 
-            checkWarehouseCapacity(warehouse, product, dto.getQuantity());
+            warehouseService.checkWarehouseCapacity(warehouse, product, dto.getQuantity());
 
             Stock stock = getStockByWarehouseAndProduct(warehouse.getId(), product.getId());
             if (stock == null) {
@@ -99,9 +97,10 @@ public class StockService {
         log.info("increaseQuantityStock - Starting incrase quantity stock for ID: {}", stockId);
         try (Transaction tx = db.beginTransaction()) {
             Stock stock = getStockByIdOrThrow(stockId);
-            checkWarehouseCapacity(stock.getWarehouse(),stock.getProduct(),quantity);
+            warehouseService.checkWarehouseCapacity(stock.getWarehouse(),stock.getProduct(),quantity);
             stock.setQuantity(stock.getQuantity() + quantity);
             stock.update(tx);
+
 
 
 
@@ -124,12 +123,28 @@ public class StockService {
     }
 
 
-    public void increaseStock(Warehouse warehouse, Product product, int requestedQuantity, Transaction tx){}
+    public void increaseStock(Warehouse warehouse, Product product, int requestedQuantity, Transaction tx){
+        Stock stock = getStockByWarehouseAndProduct(warehouse.getId(), product.getId());
+        warehouseService.checkWarehouseCapacity(warehouse,product,requestedQuantity);
+        warehouseService.updateWarehouseCapacityNoTransaction(
+                warehouse.getId(),
+                product.getWeight() * requestedQuantity,
+                product.getVolume() * requestedQuantity,
+                StockAction.INCREASE,
+                tx);
+        stock.setQuantity(stock.getQuantity() + requestedQuantity);
+        stock.update(tx);
+    }
 
     public void decrementStock(Warehouse warehouse, Product product, int requestedQuantity, Transaction tx) {
         Stock stock = getStockByWarehouseAndProduct(warehouse.getId(), product.getId());
-        int newQuantity = stock.getQuantity() - requestedQuantity;
-        stock.setQuantity(newQuantity);
+        warehouseService.updateWarehouseCapacityNoTransaction(
+                warehouse.getId(),
+                product.getWeight() * requestedQuantity,
+                product.getVolume() * requestedQuantity,
+                StockAction.DECREASE,
+                tx);
+        stock.setQuantity(stock.getQuantity() - requestedQuantity);
         stock.update(tx);
     }
 
@@ -142,26 +157,6 @@ public class StockService {
             throw new ServiceException(
                     "Requested quantity exceeds available stock. Available: " + available + ", Requested: " + requestedQuantity);
         }
-    }
-
-    public void checkWarehouseCapacity(Warehouse warehouse, Product product, int quantity) {
-        double totalVolume = product.getVolume() * quantity;
-        double totalWeight = product.getWeight() * quantity;
-        boolean exceedVolumeCapacity = totalVolume >= warehouse.getVolumeCapacity();
-        boolean exceedWeightCapacity = totalWeight >= warehouse.getWeightCapacity();
-
-        if (exceedVolumeCapacity) {
-            log.error("checkWarehouseCapacity: Warehouse volume capacity exceeded for product {} (total volume: {}, warehouse capacity: {})",
-                    product.getName(), totalVolume, warehouse.getVolumeCapacity());
-            throw new ServiceException("Error while adding stock: insufficient volume capacity for the selected product. Please try again.");
-        }
-
-        if (exceedWeightCapacity) {
-            log.error("checkWarehouseCapacity: Warehouse weight capacity exceeded for product {} (total weight: {}, warehouse capacity: {})",
-                    product.getName(), totalWeight, warehouse.getWeightCapacity());
-            throw new ServiceException("Error while adding stock: insufficient weight capacity for the selected product. Please try again.");
-        }
-
     }
 
 
@@ -182,8 +177,8 @@ public class StockService {
                 .findOneOrEmpty()
                 .orElseThrow(()->{
                     log.error("getStockByIdOrThrow: Error while retrieving Stock with ID: {}",id);
-                    return new ServiceException("Error while retrieving Stock. Please try again later.")
-                })
+                    return new ServiceException("Error while retrieving Stock. Please try again later.");
+                });
     }
 
 }

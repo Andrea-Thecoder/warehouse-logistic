@@ -74,9 +74,6 @@ public class MovementTrackService {
         int quantity = dto.getQuantity();
 
         try (Transaction tx = db.beginTransaction()) {
-            stockService.checkStockAvailability(originWarehouse, product, quantity);
-
-            stockService.checkWarehouseCapacity(destinationWarehouse, product, quantity);
 
             stockService.decrementStock(originWarehouse, product, quantity, tx);
 
@@ -96,8 +93,6 @@ public class MovementTrackService {
         }
 
     }
-
-
 
 
 

@@ -11,8 +11,10 @@ import it.warehouse.optimization.dto.search.WarehouseSearchRequest;
 import it.warehouse.optimization.dto.warehouse.BaseDetailWarehouseDTO;
 import it.warehouse.optimization.dto.warehouse.InsertWarehouseDTO;
 import it.warehouse.optimization.exception.ServiceException;
+import it.warehouse.optimization.model.Product;
 import it.warehouse.optimization.model.Region;
 import it.warehouse.optimization.model.Warehouse;
+import it.warehouse.optimization.model.enumerator.StockAction;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
@@ -57,11 +59,35 @@ public class WarehouseService {
     }
 
 
-    public void updateWarehouseCapacityNoTransaction(UUID warehouseId, int quantity){
+    public void updateWarehouseCapacityNoTransaction(UUID warehouseId, double productWeight, double productVolume, StockAction action, Transaction tx){
         Warehouse warehouse = getWarehouseByIdOrThrow(warehouseId);
-
-        warehouse.setVolumeCapacity();
+        double totalVolume = action.apply(warehouse.getAvailableVolume() * productVolume);
+        double totalWeight = action.apply(warehouse.getAvailableWeight() * productWeight);
+        warehouse.setAvailableVolume(totalVolume);
+        warehouse.setAvailableWeight(totalWeight);
+        warehouse.update(tx);
     }
+
+    public void checkWarehouseCapacity(Warehouse warehouse, Product product, int quantity) {
+        double totalVolume = product.getVolume() * quantity;
+        double totalWeight = product.getWeight() * quantity;
+        boolean exceedVolumeCapacity = totalVolume > warehouse.getAvailableVolume();
+        boolean exceedWeightCapacity = totalWeight > warehouse.getAvailableWeight();
+
+        if (exceedVolumeCapacity) {
+            log.error("checkWarehouseCapacity: Warehouse volume capacity exceeded for product {} (total volume: {}, warehouse capacity: {})",
+                    product.getName(), totalVolume, warehouse.getVolumeCapacity());
+            throw new ServiceException("Error while adding stock: insufficient volume capacity for the selected product. Please try again.");
+        }
+
+        if (exceedWeightCapacity) {
+            log.error("checkWarehouseCapacity: Warehouse weight capacity exceeded for product {} (total weight: {}, warehouse capacity: {})",
+                    product.getName(), totalWeight, warehouse.getWeightCapacity());
+            throw new ServiceException("Error while adding stock: insufficient weight capacity for the selected product. Please try again.");
+        }
+
+    }
+
 
     public Warehouse getWarehouseByIdOrThrow (UUID id){
         return db.find(Warehouse.class)
