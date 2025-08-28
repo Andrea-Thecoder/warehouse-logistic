@@ -17,6 +17,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 
+import java.util.UUID;
+
 @Tag(name = "API Routing Calculator")
 @Path("routing")
 @Slf4j
@@ -31,7 +33,7 @@ public class MovementTrackResource {
             summary = "Insert movement track.",
             description = "API for insert a new movement for a product"
     )
-    public RouteInfo insertMovementTrack(
+    public UUID insertMovementTrack(
             @Valid InsertMovementTrackDTO dto
             ){
         log.info("MovementTrackResource - insertMovementTrack");
