@@ -61,10 +61,8 @@ public class WarehouseService {
 
     public void updateWarehouseCapacityNoTransaction(UUID warehouseId, double productWeight, double productVolume, StockAction action, Transaction tx){
         Warehouse warehouse = getWarehouseByIdOrThrow(warehouseId);
-        double totalVolume = action.apply(warehouse.getAvailableVolume() * productVolume);
-        double totalWeight = action.apply(warehouse.getAvailableWeight() * productWeight);
-        warehouse.setAvailableVolume(totalVolume);
-        warehouse.setAvailableWeight(totalWeight);
+        warehouse.setAvailableVolume(action.apply(productVolume));
+        warehouse.setAvailableWeight(action.apply(productWeight));
         warehouse.update(tx);
     }
 
@@ -76,13 +74,13 @@ public class WarehouseService {
 
         if (exceedVolumeCapacity) {
             log.error("checkWarehouseCapacity: Warehouse volume capacity exceeded for product {} (total volume: {}, warehouse capacity: {})",
-                    product.getName(), totalVolume, warehouse.getVolumeCapacity());
+                    product.getName(), totalVolume, warehouse.getAvailableVolume());
             throw new ServiceException("Error while adding stock: insufficient volume capacity for the selected product. Please try again.");
         }
 
         if (exceedWeightCapacity) {
             log.error("checkWarehouseCapacity: Warehouse weight capacity exceeded for product {} (total weight: {}, warehouse capacity: {})",
-                    product.getName(), totalWeight, warehouse.getWeightCapacity());
+                    product.getName(), totalWeight, warehouse.getAvailableWeight());
             throw new ServiceException("Error while adding stock: insufficient weight capacity for the selected product. Please try again.");
         }
 

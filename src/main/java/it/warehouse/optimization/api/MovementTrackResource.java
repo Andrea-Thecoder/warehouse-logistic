@@ -19,8 +19,8 @@ import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 
 import java.util.UUID;
 
-@Tag(name = "API Routing Calculator")
-@Path("routing")
+@Tag(name = "API Stock Movement")
+@Path("movement-track")
 @Slf4j
 
 public class MovementTrackResource {

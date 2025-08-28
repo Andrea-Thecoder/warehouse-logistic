@@ -161,7 +161,7 @@ public class StockService {
     }
 
 
-    private Stock createStockNoTransaction(@Valid InsertStockDTO dto,Transaction tx){
+    private Stock createStockNoTransaction( InsertStockDTO dto,Transaction tx){
         Stock stock = dto.toEntity();
         stock.insert(tx);
         return stock;

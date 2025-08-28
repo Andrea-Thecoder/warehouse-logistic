@@ -1,6 +1,7 @@
 package it.warehouse.optimization.dto.movementtrack;
 
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import it.warehouse.optimization.model.MovementTrack;
 import it.warehouse.optimization.model.Product;
 import it.warehouse.optimization.model.Warehouse;
@@ -40,11 +41,13 @@ public class InsertMovementTrackDTO {
     private String notes;
 
     @AssertTrue(message = "Either originWarehouseId or destinationWarehouseId must be provided")
+    @JsonIgnore
     public boolean isValidWarehouses() {
         return originWarehouseId != null || destinationWarehouseId != null;
     }
 
     @AssertTrue(message = "Both originWarehouseId destinationWarehouseId must be valorized.")
+    @JsonIgnore
     public boolean isValidTransitWarehouse() {
         if (movementStatus == MovementStatus.IN_TRANSIT)
             return originWarehouseId != null && destinationWarehouseId != null;
