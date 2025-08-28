@@ -4,6 +4,7 @@ import io.ebean.Database;
 import io.ebean.ExpressionList;
 import io.ebean.PagedList;
 import io.ebean.Transaction;
+import io.smallrye.config.inject.ConfigProducerUtil;
 import it.warehouse.optimization.dto.PagedResultDTO;
 import it.warehouse.optimization.dto.search.AdvancedStockSearchRequest;
 import it.warehouse.optimization.dto.search.StockSearchRequest;
@@ -17,6 +18,7 @@ import it.warehouse.optimization.model.Warehouse;
 import it.warehouse.optimization.model.enumerator.StockAction;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.UUID;
@@ -93,38 +95,15 @@ public class StockService {
     }
 
 
-    public Long increaseQuantityStock(Long stockId, int quantity) {
-        log.info("increaseQuantityStock - Starting incrase quantity stock for ID: {}", stockId);
-        try (Transaction tx = db.beginTransaction()) {
-            Stock stock = getStockByIdOrThrow(stockId);
-            warehouseService.checkWarehouseCapacity(stock.getWarehouse(),stock.getProduct(),quantity);
-            stock.setQuantity(stock.getQuantity() + quantity);
-            stock.update(tx);
-
-
-
-
-            // aggiugnere la quantità
-        } catch (Exception e) {
-            log.error("increaseQuantityStock - Error while increasing quantity for stock id:  {}. Error message: {}", stockId, e.getMessage());
-            throw new ServiceException(e.getMessage());
-        }
-    }
-
-
-    public Long decreaseQuantityStock(Long stockId, int quantity) {
-        log.info("decreaseQuantityStock - Starting incrase quantity stock for ID: {}", stockId);
-        try (Transaction tx = db.beginTransaction()) {
-
-        } catch (Exception e) {
-            log.error("decreaseQuantityStock - Error while increasing quantity for stock id:  {}. Error message: {}", stockId, e.getMessage());
-            throw new ServiceException(e.getMessage());
-        }
-    }
-
-
     public void increaseStock(Warehouse warehouse, Product product, int requestedQuantity, Transaction tx){
         Stock stock = getStockByWarehouseAndProduct(warehouse.getId(), product.getId());
+        if(stock == null){
+            InsertStockDTO dto = new InsertStockDTO();
+            dto.setProductId(product.getId());
+            dto.setWarehouseId(warehouse.getId());
+            dto.setQuantity(0);
+            stock = createStockNoTransaction(dto,tx);
+        }
         warehouseService.checkWarehouseCapacity(warehouse,product,requestedQuantity);
         warehouseService.updateWarehouseCapacityNoTransaction(
                 warehouse.getId(),
@@ -138,6 +117,7 @@ public class StockService {
 
     public void decrementStock(Warehouse warehouse, Product product, int requestedQuantity, Transaction tx) {
         Stock stock = getStockByWarehouseAndProduct(warehouse.getId(), product.getId());
+        checkStockAvailability(stock,warehouse, product,requestedQuantity);
         warehouseService.updateWarehouseCapacityNoTransaction(
                 warehouse.getId(),
                 product.getWeight() * requestedQuantity,
@@ -148,8 +128,7 @@ public class StockService {
         stock.update(tx);
     }
 
-    public void checkStockAvailability(Warehouse warehouse, Product product, int requestedQuantity) {
-        Stock stock = getStockByWarehouseAndProduct(warehouse.getId(), product.getId());
+    public void checkStockAvailability(Stock stock,Warehouse warehouse, Product product, int requestedQuantity) {
         if (stock == null || requestedQuantity > stock.getQuantity()) {
             int available = stock != null ? stock.getQuantity() : 0;
             log.error("checkStockAvailability: Requested quantity ({}) exceeds available stock ({}) in warehouse {} for product {}.",
@@ -179,6 +158,13 @@ public class StockService {
                     log.error("getStockByIdOrThrow: Error while retrieving Stock with ID: {}",id);
                     return new ServiceException("Error while retrieving Stock. Please try again later.");
                 });
+    }
+
+
+    private Stock createStockNoTransaction(@Valid InsertStockDTO dto,Transaction tx){
+        Stock stock = dto.toEntity();
+        stock.insert(tx);
+        return stock;
     }
 
 }

@@ -9,10 +9,7 @@ import it.warehouse.optimization.dto.warehouse.InsertWarehouseDTO;
 import it.warehouse.optimization.service.WarehouseService;
 import jakarta.inject.Inject;
 import jakarta.validation.Valid;
-import jakarta.ws.rs.BeanParam;
-import jakarta.ws.rs.GET;
-import jakarta.ws.rs.POST;
-import jakarta.ws.rs.Path;
+import jakarta.ws.rs.*;
 import lombok.extern.slf4j.Slf4j;
 import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
@@ -55,6 +52,7 @@ public class WarehouseResource {
         log.info("WarehouseResource - findAllWarehouse");
         return warehouseService.findWarehouse(request);
     }
+
 
 
 }

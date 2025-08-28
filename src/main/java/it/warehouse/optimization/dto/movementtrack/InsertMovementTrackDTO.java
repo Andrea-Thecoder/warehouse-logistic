@@ -4,6 +4,8 @@ package it.warehouse.optimization.dto.movementtrack;
 import it.warehouse.optimization.model.MovementTrack;
 import it.warehouse.optimization.model.Product;
 import it.warehouse.optimization.model.Warehouse;
+import it.warehouse.optimization.model.enumerator.MovementStatus;
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import lombok.AllArgsConstructor;
@@ -11,6 +13,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.awt.event.MouseEvent;
 import java.util.UUID;
 
 @Getter
@@ -20,10 +23,11 @@ import java.util.UUID;
 
 public class InsertMovementTrackDTO {
 
-    @NotNull(message = "Origin warehouse ID must be valorized.")
+    @NotNull(message = "Movement Status warehouse ID must be valorized.")
+    private MovementStatus movementStatus;
+
     private UUID originWarehouseId;
 
-    @NotNull(message = "Destination warehouse ID must be valorized.")
     private UUID destinationWarehouseId;
 
     @NotNull(message = "Product ID must be valorized.")
@@ -35,12 +39,25 @@ public class InsertMovementTrackDTO {
 
     private String notes;
 
+    @AssertTrue(message = "Either originWarehouseId or destinationWarehouseId must be provided")
+    public boolean isValidWarehouses() {
+        return originWarehouseId != null || destinationWarehouseId != null;
+    }
 
-    public MovementTrack toEntity(){
+    @AssertTrue(message = "Both originWarehouseId destinationWarehouseId must be valorized.")
+    public boolean isValidTransitWarehouse() {
+        if (movementStatus == MovementStatus.IN_TRANSIT)
+            return originWarehouseId != null && destinationWarehouseId != null;
+        return true;
+    }
+
+    public MovementTrack toEntity() {
         MovementTrack mt = new MovementTrack();
-        mt.setOriginWarehouse(mt.db().reference(Warehouse.class,originWarehouseId));
-        mt.setDestinationWarehouse(mt.db().reference(Warehouse.class,destinationWarehouseId));
-        mt.setProduct(mt.db().reference(Product.class,productId));
+        if (originWarehouseId != null)
+            mt.setOriginWarehouse(mt.db().reference(Warehouse.class, originWarehouseId));
+        if (destinationWarehouseId != null)
+            mt.setDestinationWarehouse(mt.db().reference(Warehouse.class, destinationWarehouseId));
+        mt.setProduct(mt.db().reference(Product.class, productId));
         mt.setQuantity(quantity);
         return mt;
     }

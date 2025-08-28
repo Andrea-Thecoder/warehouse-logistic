@@ -6,5 +6,7 @@ public enum MovementStatus {
     SENT,
     RECEIVED,
     IN_TRANSIT,
-    CANCELLED
+    CANCELLED,
+    FROM_FACTORY,
+    TO_SALE
 }

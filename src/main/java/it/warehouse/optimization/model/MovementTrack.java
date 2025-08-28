@@ -27,11 +27,11 @@ public class MovementTrack  extends  AbstractAuditable{
     private UUID id;
 
     @ManyToOne
-    @JoinColumn(name = "origin_warehouse_id", nullable = false)
+    @JoinColumn(name = "origin_warehouse_id")
     private Warehouse originWarehouse;
 
     @ManyToOne
-    @JoinColumn(name = "destination_warehouse_id", nullable = false)
+    @JoinColumn(name = "destination_warehouse_id")
     private Warehouse destinationWarehouse;
 
     @ManyToOne
@@ -41,10 +41,10 @@ public class MovementTrack  extends  AbstractAuditable{
     @Column(nullable = false)
     private Integer quantity;
 
-    @Column(precision =  12,nullable = false)
+    @Column(precision =  12)
     private BigDecimal estimatedDurationMillis;
 
-    @Column(precision =  19, scale = 10,nullable = false)
+    @Column(precision =  19, scale = 10)
     private BigDecimal estimatedDistanceMeters;
 
     @Column

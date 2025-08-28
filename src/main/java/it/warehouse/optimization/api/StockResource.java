@@ -70,7 +70,7 @@ public class StockResource {
         return  stockService.getStocksByWarehouse(warehouseId,request);
     }
 
-    @PUT
+   /* @PUT
     @Path("/{stockId}/add-quantity")
     @Operation(
             summary = "Increase quantity for a Stock.",
@@ -85,9 +85,9 @@ public class StockResource {
                 .payload(stockService.increaseQuantityStock(stockId,dto.getQuantity()))
                 .message("Stock quantity increased successfully")
                 .build();
-    }
+    }*/
 
-    @PUT
+  /*  @PUT
     @Path("/{stockId}/subtract-quantity")
     @Operation(
             summary = "Subtract quantity for a Stock.",
@@ -102,7 +102,7 @@ public class StockResource {
                 .payload(stockService.decreaseQuantityStock(stockId,dto.getQuantity()))
                 .message("Stock quantity decreased successfully")
                 .build();
-    }
+    }*/
 
 
 

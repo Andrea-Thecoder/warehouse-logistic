@@ -1,8 +1,8 @@
 package it.warehouse.optimization.model.enumerator;
 
 public enum StockAction {
-    INCREASE(1),
-    DECREASE(-1);
+    INCREASE(-1),
+    DECREASE(1);
 
 
     private final int factor;

@@ -41,7 +41,7 @@ public class InsertWarehouseDTO {
         warehouse.setName(this.name);
         warehouse.setVolumeCapacity(this.volumeCapacity);
         warehouse.setWeightCapacity(this.weightCapacity);
-        warehouse.setAvailableWeight(this.weightCapacity;
+        warehouse.setAvailableWeight(this.weightCapacity);
         warehouse.setAvailableVolume(this.volumeCapacity);
         warehouse.setCity(warehouse.db().reference(City.class,this.cityId));
         return warehouse;
