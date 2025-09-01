@@ -104,7 +104,6 @@ public class StockService {
             dto.setQuantity(0);
             stock = createStockNoTransaction(dto,tx);
         }
-        warehouseService.checkWarehouseCapacity(warehouse,product,requestedQuantity);
         warehouseService.updateWarehouseCapacityNoTransaction(
                 warehouse.getId(),
                 product.getWeight() * requestedQuantity,

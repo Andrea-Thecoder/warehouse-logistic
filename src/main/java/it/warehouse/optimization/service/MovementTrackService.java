@@ -87,6 +87,7 @@ public class MovementTrackService {
             int quantity = movementTrack.getQuantity();
             String notes =""; //TODO caprie come mettere le eventuali note qui!
 
+            warehouseService.checkWarehouseCapacity(destinationWarehouse,product,quantity);
             stockService.increaseStock(destinationWarehouse, product, quantity, tx);
 
             InsertMovementStatusHistoryDTO historyDTO = new InsertMovementStatusHistoryDTO(movementTrack.getId(), movementTrack.getProduct().getId(), movementTrack.getQuantity(), notes);
@@ -162,7 +163,8 @@ public class MovementTrackService {
 
             RouteInfo route = routingService.calculateRoute(originWarehouse.getCity(), destinationWarehouse.getCity());
 
-            MovementTrack movementTrack = createMovementTrackNoTransaction(dto, route, tx);
+            MovementTrack movementTrack = createMovementTrackNoTransaction(dto, tx);
+
 
             InsertMovementStatusHistoryDTO historyDTO = new InsertMovementStatusHistoryDTO(movementTrack.getId(), movementTrack.getProduct().getId(), movementTrack.getQuantity(), dto.getNotes());
 
@@ -177,15 +179,7 @@ public class MovementTrackService {
     }
 
 
-    private MovementTrack createMovementTrackNoTransaction(InsertMovementTrackDTO dto, RouteInfo route, Transaction tx) {
-        MovementTrack movementTrack = dto.toEntity();
-        movementTrack.setEstimatedDistanceMeters(route.getDistanceInMeters());
-        movementTrack.setEstimatedDurationMillis(route.getTimeInMillis());
-        movementTrack.insert(tx);
-        movementTrack.setEstimatedArrival(RoutingUtils.calculateEstimatedArrival(movementTrack.get_dataCreazione(), route.getTimeInMillis()));
-        movementTrack.update(tx);
-        return movementTrack;
-    }
+
 
     private MovementTrack createMovementTrackNoTransaction(InsertMovementTrackDTO dto, Transaction tx) {
         MovementTrack movementTrack = dto.toEntity();

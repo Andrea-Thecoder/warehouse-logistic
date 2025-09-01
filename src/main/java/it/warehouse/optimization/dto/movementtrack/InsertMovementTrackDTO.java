@@ -2,10 +2,12 @@ package it.warehouse.optimization.dto.movementtrack;
 
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import it.warehouse.optimization.dto.movementdestination.InsertMovementDestinationDTO;
 import it.warehouse.optimization.model.MovementTrack;
 import it.warehouse.optimization.model.Product;
 import it.warehouse.optimization.model.Warehouse;
 import it.warehouse.optimization.model.enumerator.MovementStatus;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -13,8 +15,10 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.apache.commons.collections4.CollectionUtils;
 
 import java.awt.event.MouseEvent;
+import java.util.Set;
 import java.util.UUID;
 
 @Getter
@@ -29,7 +33,8 @@ public class InsertMovementTrackDTO {
 
     private UUID originWarehouseId;
 
-    private UUID destinationWarehouseId;
+    @Valid
+    private Set<InsertMovementDestinationDTO> destinations;
 
     @NotNull(message = "Product ID must be valorized.")
     private UUID productId;
@@ -43,14 +48,16 @@ public class InsertMovementTrackDTO {
     @AssertTrue(message = "Either originWarehouseId or destinationWarehouseId must be provided")
     @JsonIgnore
     public boolean isValidWarehouses() {
-        return originWarehouseId != null || destinationWarehouseId != null;
+        boolean hasOrigin = originWarehouseId != null;
+        boolean hasOneDestination = CollectionUtils.isNotEmpty(destinations) && destinations.size() == 1;
+        return hasOrigin || hasOneDestination;
     }
 
     @AssertTrue(message = "Both originWarehouseId destinationWarehouseId must be valorized.")
     @JsonIgnore
     public boolean isValidTransitWarehouse() {
         if (movementStatus == MovementStatus.IN_TRANSIT)
-            return originWarehouseId != null && destinationWarehouseId != null;
+            return originWarehouseId != null && CollectionUtils.isNotEmpty(destinations);
         return true;
     }
 
@@ -58,8 +65,6 @@ public class InsertMovementTrackDTO {
         MovementTrack mt = new MovementTrack();
         if (originWarehouseId != null)
             mt.setOriginWarehouse(mt.db().reference(Warehouse.class, originWarehouseId));
-        if (destinationWarehouseId != null)
-            mt.setDestinationWarehouse(mt.db().reference(Warehouse.class, destinationWarehouseId));
         mt.setProduct(mt.db().reference(Product.class, productId));
         mt.setQuantity(quantity);
         return mt;

@@ -31,10 +31,6 @@ public class MovementTrack  extends  AbstractAuditable{
     private Warehouse originWarehouse;
 
     @ManyToOne
-    @JoinColumn(name = "destination_warehouse_id")
-    private Warehouse destinationWarehouse;
-
-    @ManyToOne
     @JoinColumn(name = "product_id", nullable = false)
     private Product product;
 
@@ -42,13 +38,13 @@ public class MovementTrack  extends  AbstractAuditable{
     private Integer quantity;
 
     @Column(precision =  12)
-    private BigDecimal estimatedDurationMillis;
+    private BigDecimal estimatedTotalDurationMillis;
 
     @Column(precision =  19, scale = 10)
-    private BigDecimal estimatedDistanceMeters;
+    private BigDecimal estimatedTotalDistanceMeters;
 
     @Column
-    private LocalDateTime estimatedArrival;
+    private LocalDateTime estimatedFinalDateForFinalTravel;
 
     @Column
     private String veicoloDaImplementare;

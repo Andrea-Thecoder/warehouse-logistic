@@ -1,6 +1,7 @@
 package it.warehouse.optimization.model;
 
 
+import io.ebean.annotation.Index;
 import it.warehouse.optimization.model.enumerator.MovementStatus;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -26,11 +27,17 @@ public class MovementStatusHistory  extends  AbstractAuditable{
     private MovementTrack movementTrack;
 
     @ManyToOne
+    @JoinColumn(name = "movement_track_destination_id")
+    private MovementTrackDestination movementTrackDestination;
+
+    @ManyToOne
     @JoinColumn(name = "product_id", nullable = false)
+    @Index
     private Product product;
 
     @Column(nullable = false)
     @Enumerated(EnumType.STRING)
+    @Index
     private MovementStatus status;
 
     @Column(nullable = false)
