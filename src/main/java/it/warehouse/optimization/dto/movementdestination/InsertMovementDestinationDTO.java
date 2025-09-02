@@ -41,7 +41,7 @@ public class InsertMovementDestinationDTO {
         if (this == o ) return true;
         if (o == null || this.getClass() != o.getClass()) return false;
         InsertMovementDestinationDTO that = (InsertMovementDestinationDTO) o;
-        return destinationWarehouseId != null && destinationWarehouseId.equals(that.getDestinationWarehouseId())
+        return destinationWarehouseId != null && destinationWarehouseId.equals(that.getDestinationWarehouseId());
     }
 
 

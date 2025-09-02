@@ -35,10 +35,8 @@ public sealed class BaseDetailMovementTrackDTO permits  DetailMovementTrackDTO {
         BaseDetailMovementTrackDTO dto = new BaseDetailMovementTrackDTO();
         dto.setId(mt.getId());
         dto.setOriginWarehouse(SimpleDetailWarehouseDTO.of(mt.getOriginWarehouse()));
-        dto.setDestinationWarehouse(SimpleDetailWarehouseDTO.of(mt.getDestinationWarehouse()));
         dto.setProduct(SimpleDetailProductDTO.of(mt.getProduct()));
         dto.setQuantity(mt.getQuantity());
-        dto.setEstimatedArrival(mt.getEstimatedArrival());
         return dto;
     }
 

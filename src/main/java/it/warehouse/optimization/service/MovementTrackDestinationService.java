@@ -26,8 +26,7 @@ public class MovementTrackDestinationService {
     public UUID createMovementDestinationNoTransaction(InsertMovementDestinationDTO dto, MovementTrack movementTrack, Transaction tx){
         MovementTrackDestination mtd = dto.toEntity();
         mtd.setMovementTrack(movementTrack);
-
-
+        return mtd.getId();
 
     }
 }

@@ -82,7 +82,7 @@ public class MovementTrackService {
         try (Transaction tx = db.beginTransaction()) {
             MovementTrack  movementTrack = getMovementTrackOrThrow(movementTrackId);
 
-            Warehouse destinationWarehouse = movementTrack.getDestinationWarehouse();
+            Warehouse destinationWarehouse = null;
             Product product = movementTrack.getProduct();
             int quantity = movementTrack.getQuantity();
             String notes =""; //TODO caprie come mettere le eventuali note qui!
@@ -128,7 +128,7 @@ public class MovementTrackService {
         log.info("handleStatusFromFactory: Status FROM_FACTORY selected.");
         try (Transaction tx = db.beginTransaction()) {
 
-            Warehouse destinationWarehouse = warehouseService.getWarehouseByIdOrThrow(dto.getDestinationWarehouseId());
+            Warehouse destinationWarehouse = warehouseService.getWarehouseByIdOrThrow(null);
             Product product = productService.getProductByIdOrThrow(dto.getProductId());
             int quantity = dto.getQuantity();
 
@@ -153,7 +153,7 @@ public class MovementTrackService {
         try (Transaction tx = db.beginTransaction()) {
 
             Warehouse originWarehouse = warehouseService.getWarehouseByIdOrThrow(dto.getOriginWarehouseId());
-            Warehouse destinationWarehouse = warehouseService.getWarehouseByIdOrThrow(dto.getDestinationWarehouseId());
+            Warehouse destinationWarehouse = warehouseService.getWarehouseByIdOrThrow(null);
             Product product = productService.getProductByIdOrThrow(dto.getProductId());
             int quantity = dto.getQuantity();
 
