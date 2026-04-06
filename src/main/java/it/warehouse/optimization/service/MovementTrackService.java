@@ -5,22 +5,31 @@ import io.ebean.ExpressionList;
 import io.ebean.PagedList;
 import io.ebean.Transaction;
 import it.warehouse.optimization.dto.PagedResultDTO;
+import it.warehouse.optimization.dto.movementdestination.InsertMovementDestinationDTO;
 import it.warehouse.optimization.dto.movementhistory.InsertMovementStatusHistoryDTO;
 import it.warehouse.optimization.dto.movementtrack.BaseDetailMovementTrackDTO;
 import it.warehouse.optimization.dto.movementtrack.InsertMovementTrackDTO;
-import it.warehouse.optimization.dto.routing.RouteInfo;
+import it.warehouse.optimization.dto.movementtrack.ReceivedMovementTrackDTO;
+import it.warehouse.optimization.dto.routing.MultiRouteInfo;
 import it.warehouse.optimization.dto.search.MovementSearchRequest;
 import it.warehouse.optimization.exception.ServiceException;
 import it.warehouse.optimization.model.MovementTrack;
+import it.warehouse.optimization.model.MovementTrackDestination;
 import it.warehouse.optimization.model.Product;
 import it.warehouse.optimization.model.Warehouse;
 import it.warehouse.optimization.model.enumerator.MovementStatus;
-import it.warehouse.optimization.utils.RoutingUtils;
+
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
-
-import java.util.UUID;
+import org.apache.commons.lang3.ObjectUtils;
 
 @ApplicationScoped
 @Slf4j
@@ -46,11 +55,16 @@ public class MovementTrackService {
     @Inject
     RoutingService routingService;
 
+    private static final String DEFAULT_RECEIVED_NOTE = "Prodotto ricevuto.";
+    private static final String DEFAULT_CANCELLED_NOTE = "Movimento cancellato.";
+
 
     public PagedResultDTO<BaseDetailMovementTrackDTO> findAllMovement(MovementSearchRequest request) {
         log.info("findAllMovement: Starting find all movement track");
         ExpressionList<MovementTrack> query = db.find(MovementTrack.class)
                 .setLabel("findAllMovement")
+                .fetch("destinations")
+                .fetch("destinations.destinationWarehouse", "id, name")
                 .where();
 
         request.filterBuilder(query);
@@ -77,28 +91,61 @@ public class MovementTrackService {
     }
 
 
-    public UUID handleStatusReceived(UUID movementTrackId){
-        log.info("handleStatusReceived: Status RECEIVED selected.");
+    public UUID handleStatusReceived(UUID movementTrackId, ReceivedMovementTrackDTO dto) {
+        log.info("handleStatusReceived:  Update status for MovementTrack: {}.", movementTrackId);
+        MovementTrack movementTrack = getMovementTrackOrThrow(movementTrackId);
+        if (!validateReceivedQuantity(dto, movementTrack.getQuantity())) {
+            log.error("handleStatusReceived: Received quantity inconsistent with declared status.");
+            throw new ServiceException("Received quantity inconsistent with declared status.");
+        }
+        Warehouse destinationWh = warehouseService.getWarehouseByIdOrThrow(dto.getDestinationWarehouseId());
         try (Transaction tx = db.beginTransaction()) {
-            MovementTrack  movementTrack = getMovementTrackOrThrow(movementTrackId);
-
-            Warehouse destinationWarehouse = null;
             Product product = movementTrack.getProduct();
-            int quantity = movementTrack.getQuantity();
-            String notes =""; //TODO caprie come mettere le eventuali note qui!
+            int quantity = dto.getReceivedQuantity();
+            String notes = ObjectUtils.firstNonNull(dto.getNotes(), DEFAULT_RECEIVED_NOTE);
 
-            warehouseService.checkWarehouseCapacity(destinationWarehouse,product,quantity);
-            stockService.increaseStock(destinationWarehouse, product, quantity, tx);
+            warehouseService.checkWarehouseCapacity(destinationWh, product, quantity);
+            stockService.increaseStock(destinationWh, product, quantity, tx);
 
-            InsertMovementStatusHistoryDTO historyDTO = new InsertMovementStatusHistoryDTO(movementTrack.getId(), movementTrack.getProduct().getId(), movementTrack.getQuantity(), notes);
+            movementTrack.setStatus(dto.getMovementStatus());
+            movementTrack.update(tx);
+
+            InsertMovementStatusHistoryDTO historyDTO = new InsertMovementStatusHistoryDTO(movementTrack.getId(), product.getId(), quantity, notes);
             movementStatusHistoryService.createMovementHistory(historyDTO, MovementStatus.RECEIVED, tx);
             tx.commit();
             return movementTrack.getId();
         } catch (Exception e) {
-            log.error("handleStatusReceived: An error occurred while creating a new movement track for status RECEIVED. Error message: {}", e.getMessage());
-            throw new ServiceException(e.getMessage());
+            log.error("handleStatusReceived: An error occurred while updating a movement track. Error message: {}", e.getMessage());
+            throw new ServiceException("Error while update status. Try again later.");
         }
     }
+
+    public void handleStatusCancelled(UUID movementTrackId,String notes) {
+        log.info("handleStatusCancelled:  Update status for MovementTrack: {}.", movementTrackId);
+        MovementTrack movementTrack = getMovementTrackOrThrow(movementTrackId);
+        MovementStatus actualStatus = movementTrack.getStatus();
+        if (!MovementStatus.VALID_INSERT_STATUS.contains(actualStatus)) {
+            log.error("handleStatusCancelled: Actual status ({}) can not be cancelled.", actualStatus);
+            throw new ServiceException("This movement can not be cancelled.");
+        }
+        try (Transaction tx = db.beginTransaction()) {
+            if (MovementStatus.FROM_FACTORY.equals(actualStatus)) {
+
+            } else
+                stockService.increaseStock(movementTrack.getOriginWarehouse(), movementTrack.getProduct(), movementTrack.getQuantity(), tx);
+
+            movementTrack.setStatus(MovementStatus.CANCELLED);
+            movementTrack.update(tx);
+            InsertMovementStatusHistoryDTO historyDTO = new InsertMovementStatusHistoryDTO(movementTrack.getId(), movementTrack.getProduct().getId(), movementTrack.getQuantity(), ObjectUtils.firstNonNull(notes,DEFAULT_CANCELLED_NOTE));
+            movementStatusHistoryService.createMovementHistory(historyDTO, MovementStatus.RECEIVED, tx);
+            tx.commit();
+
+        } catch (Exception e) {
+            log.error("handleStatusCancelled: An error occurred while set cancelled movement track. Error message: {}", e.getMessage());
+            throw new ServiceException("Error while cancelling movement. Try again later.");
+        }
+    }
+
 
     private UUID handleStatusToSale(InsertMovementTrackDTO dto) {
         log.info("handleStatusToSale: Status TO_SALE selected.");
@@ -128,16 +175,21 @@ public class MovementTrackService {
         log.info("handleStatusFromFactory: Status FROM_FACTORY selected.");
         try (Transaction tx = db.beginTransaction()) {
 
-            Warehouse destinationWarehouse = warehouseService.getWarehouseByIdOrThrow(null);
+            InsertMovementDestinationDTO destinationDTO = dto.getDestinations().iterator().next();
+            Warehouse destinationWarehouse = warehouseService.getWarehouseByIdOrThrow(destinationDTO.getDestinationWarehouseId());
             Product product = productService.getProductByIdOrThrow(dto.getProductId());
             int quantity = dto.getQuantity();
 
+            stockService.increaseStock(destinationWarehouse, product, quantity, tx);
 
-            stockService.increaseStock(destinationWarehouse,product,quantity,tx);
             MovementTrack movementTrack = createMovementTrackNoTransaction(dto, tx);
 
-            InsertMovementStatusHistoryDTO historyDTO = new InsertMovementStatusHistoryDTO(movementTrack.getId(), movementTrack.getProduct().getId(), movementTrack.getQuantity(), dto.getNotes());
+            MovementTrackDestination destination = destinationDTO.toEntity();
+            destination.setMovementTrack(movementTrack);
+            destination.setStopOrder(1);
+            destination.insert(tx);
 
+            InsertMovementStatusHistoryDTO historyDTO = new InsertMovementStatusHistoryDTO(movementTrack.getId(), product.getId(), quantity, dto.getNotes());
             movementStatusHistoryService.createMovementHistory(historyDTO, MovementStatus.FROM_FACTORY, tx);
             tx.commit();
             return movementTrack.getId();
@@ -152,24 +204,53 @@ public class MovementTrackService {
         log.info("handleStatusInTransit: Status IN_TRANSIT selected.");
         try (Transaction tx = db.beginTransaction()) {
 
+            // 1. Carica magazzino origine e prodotto
             Warehouse originWarehouse = warehouseService.getWarehouseByIdOrThrow(dto.getOriginWarehouseId());
-            Warehouse destinationWarehouse = warehouseService.getWarehouseByIdOrThrow(null);
             Product product = productService.getProductByIdOrThrow(dto.getProductId());
-            int quantity = dto.getQuantity();
 
-            warehouseService.checkWarehouseCapacity(destinationWarehouse,product,quantity);
+            // 2. Costruisce mappa destinationWarehouseId → DTO e Set<Warehouse> per il routing
+            Map<UUID, InsertMovementDestinationDTO> destinationDTOMap = new HashMap<>();
+            Set<Warehouse> destinationWarehouses = new HashSet<>();
+            for (InsertMovementDestinationDTO destDTO : dto.getDestinations()) {
+                Warehouse w = warehouseService.getWarehouseByIdOrThrow(destDTO.getDestinationWarehouseId());
+                destinationWarehouses.add(w);
+                destinationDTOMap.put(w.getId(), destDTO);
+            }
 
-            stockService.decrementStock(originWarehouse, product, quantity, tx);
+            // 3. Decrementa stock all'origine per la quantità totale
+            stockService.decrementStock(originWarehouse, product, dto.getQuantity(), tx);
 
-            RouteInfo route = routingService.calculateRoute(originWarehouse.getCity(), destinationWarehouse.getCity());
+            // 4. Calcola rotta ottimale multi-tappa (OR-Tools + GraphHopper)
+            List<MultiRouteInfo> route = routingService.calculateMultiDropRoute(originWarehouse, destinationWarehouses);
 
-            MovementTrack movementTrack = createMovementTrackNoTransaction(dto, tx);
+            // 5. Crea MovementTrack con i totali del routing (richiesti dalla constraint chk_origin_duration_distance)
+            MultiRouteInfo summary = route.getFirst(); // stopOrder=0 è sempre il summary
+            MovementTrack movementTrack = dto.toEntity();
+            movementTrack.setStatus(MovementStatus.IN_TRANSIT);
+            movementTrack.setEstimatedTotalDistanceMeters(summary.getDistanceInMeters());
+            movementTrack.setEstimatedTotalDurationMillis(summary.getTimeInMillis());
+            movementTrack.insert(tx);
 
+            // 6. Crea MovementTrackDestination per ogni tappa (salta summary a indice 0)
+            for (MultiRouteInfo leg : route) {
+                if (leg.getStopOrder() == 0) continue;
+                UUID destWarehouseId = leg.getToWarehouse().getId();
+                InsertMovementDestinationDTO destDTO = destinationDTOMap.get(destWarehouseId);
 
-            InsertMovementStatusHistoryDTO historyDTO = new InsertMovementStatusHistoryDTO(movementTrack.getId(), movementTrack.getProduct().getId(), movementTrack.getQuantity(), dto.getNotes());
+                MovementTrackDestination destination = destDTO.toEntity();
+                destination.setMovementTrack(movementTrack);
+                destination.setStopOrder(leg.getStopOrder());
+                destination.setEstimatedDistanceMeters(leg.getDistanceInMeters());
+                destination.setEstimatedDurationMillis(leg.getTimeInMillis());
+                destination.setEstimatedArrival(leg.getEstimatedArrival());
+                destination.insert(tx);
+            }
 
+            // 7. Crea history SENT e IN_TRANSIT
+            InsertMovementStatusHistoryDTO historyDTO = new InsertMovementStatusHistoryDTO(movementTrack.getId(), product.getId(), dto.getQuantity(), dto.getNotes());
             movementStatusHistoryService.createMovementHistory(historyDTO, MovementStatus.SENT, tx);
             movementStatusHistoryService.createMovementHistory(historyDTO, MovementStatus.IN_TRANSIT, tx);
+
             tx.commit();
             return movementTrack.getId();
         } catch (Exception e) {
@@ -179,8 +260,6 @@ public class MovementTrackService {
     }
 
 
-
-
     private MovementTrack createMovementTrackNoTransaction(InsertMovementTrackDTO dto, Transaction tx) {
         MovementTrack movementTrack = dto.toEntity();
         movementTrack.insert(tx);
@@ -188,17 +267,25 @@ public class MovementTrackService {
     }
 
 
-    private MovementTrack getMovementTrackOrThrow(UUID movementTrackId){
+    private boolean validateReceivedQuantity(ReceivedMovementTrackDTO dto, int expectedQuantity) {
+        boolean isReceived = expectedQuantity == dto.getReceivedQuantity() && MovementStatus.RECEIVED.equals(dto.getMovementStatus());
+        boolean isPartiallyReceived = expectedQuantity > dto.getReceivedQuantity() && MovementStatus.PARTIALLY_RECEIVED.equals(dto.getMovementStatus());
+        boolean isOverReceived = expectedQuantity < dto.getReceivedQuantity() && MovementStatus.OVER_RECEIVED.equals(dto.getMovementStatus());
+        return isReceived || isPartiallyReceived || isOverReceived;
+    }
+
+    private MovementTrack getMovementTrackOrThrow(UUID movementTrackId) {
         return db.find(MovementTrack.class)
                 .setLabel("getMovementTrackOrThrow")
                 .where()
                 .idEq(movementTrackId)
                 .findOneOrEmpty()
-                .orElseThrow(()-> {
-                    log.error("getMovementTrackOrThrow: Error movement track with ID: {} , not exist",movementTrackId);
-                    return new ServiceException("Error movement track with ID: "+ movementTrackId +" , not exist");
+                .orElseThrow(() -> {
+                    log.error("getMovementTrackOrThrow: Error movement track with ID: {} , not exist", movementTrackId);
+                    return new ServiceException("Error movement track with ID: " + movementTrackId + " , not exist");
                 });
     }
+
 
 }
 

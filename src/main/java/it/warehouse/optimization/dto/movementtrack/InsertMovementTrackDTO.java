@@ -28,7 +28,7 @@ import java.util.UUID;
 
 public class InsertMovementTrackDTO {
 
-    @NotNull(message = "Movement Status warehouse ID must be valorized.")
+    @NotNull(message = "Movement Status must be valorized.")
     private MovementStatus movementStatus;
 
     private UUID originWarehouseId;
@@ -44,6 +44,12 @@ public class InsertMovementTrackDTO {
     private Integer quantity;
 
     private String notes;
+
+    @AssertTrue(message = "Movement Status not authorized for this operation.")
+    @JsonIgnore
+    public boolean isValidMovementStatus(){
+        return movementStatus != null && MovementStatus.VALID_INSERT_STATUS.contains(movementStatus);
+    }
 
     @AssertTrue(message = "Either originWarehouseId or destinationWarehouseId must be provided")
     @JsonIgnore
@@ -65,6 +71,7 @@ public class InsertMovementTrackDTO {
         MovementTrack mt = new MovementTrack();
         if (originWarehouseId != null)
             mt.setOriginWarehouse(mt.db().reference(Warehouse.class, originWarehouseId));
+        mt.setStatus(movementStatus);
         mt.setProduct(mt.db().reference(Product.class, productId));
         mt.setQuantity(quantity);
         return mt;

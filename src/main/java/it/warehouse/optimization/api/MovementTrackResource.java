@@ -4,15 +4,17 @@ package it.warehouse.optimization.api;
 import it.warehouse.optimization.dto.PagedResultDTO;
 import it.warehouse.optimization.dto.movementtrack.BaseDetailMovementTrackDTO;
 import it.warehouse.optimization.dto.movementtrack.InsertMovementTrackDTO;
-import it.warehouse.optimization.dto.routing.RouteInfo;
+import it.warehouse.optimization.dto.movementtrack.ReceivedMovementTrackDTO;
 import it.warehouse.optimization.dto.search.MovementSearchRequest;
 import it.warehouse.optimization.service.MovementTrackService;
 import jakarta.inject.Inject;
 import jakarta.validation.Valid;
 import jakarta.ws.rs.BeanParam;
 import jakarta.ws.rs.GET;
+import jakarta.ws.rs.PATCH;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
 import lombok.extern.slf4j.Slf4j;
 import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
@@ -38,6 +40,33 @@ public class MovementTrackResource {
             ){
         log.info("MovementTrackResource - insertMovementTrack");
         return movementTrackService.handleMovementTrack(dto);
+    }
+
+    @PATCH
+    @Path("/{movementTrackId}/received")
+    @Operation(
+            summary = "Mark movement as received.",
+            description = "Registers the reception of a movement at the destination warehouse and updates stock accordingly."
+    )
+    public UUID receivedMovementTrack(
+            @PathParam("movementTrackId") UUID movementTrackId,
+            @Valid ReceivedMovementTrackDTO dto
+    ) {
+        log.info("MovementTrackResource - receivedMovementTrack");
+        return movementTrackService.handleStatusReceived(movementTrackId, dto);
+    }
+
+    @PATCH
+    @Path("/{movementTrackId}/cancelled")
+    @Operation(
+            summary = "Cancel a movement track.",
+            description = "Cancels an existing movement and compensates stock accordingly. Only applicable to IN_TRANSIT, FROM_FACTORY and TO_SALE statuses."
+    )
+    public UUID cancelledMovementTrack(
+            @PathParam("movementTrackId") UUID movementTrackId
+    ) {
+        log.info("MovementTrackResource - cancelledMovementTrack");
+        return movementTrackService.handleStatusCancelled(movementTrackId);
     }
 
     @GET

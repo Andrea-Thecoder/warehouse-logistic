@@ -77,17 +77,19 @@ Giacenza di un prodotto in un magazzino.
 | reservedQuantity | Integer | Quantità riservata (non disponibile) |
 
 ### MovementTrack
-Tabella: `movementtrack`
+Tabella: `movement_track`
 Movimento di merci — può essere tra magazzini, da fabbrica o verso punto vendita.
 
 | Campo | Tipo | Note |
 |-------|------|------|
-| id | Long | PK |
-| originWarehouse | Warehouse | FK → warehouse (sorgente) |
+| id | UUID | PK |
+| originWarehouse | Warehouse | FK → warehouse (sorgente), nullable |
 | product | Product | FK → product |
 | quantity | Integer | Quantità mossa |
-| status | MovementStatus | Stato corrente (enum) |
-| note | String | Note libere |
+| status | MovementStatus | Stato corrente (enum), aggiornato ad ogni transizione |
+| estimatedTotalDistanceMeters | BigDecimal | Distanza totale stimata (metri) |
+| estimatedTotalDurationMillis | BigDecimal | Durata totale stimata (ms) |
+| estimatedFinalDateForFinalTravel | LocalDateTime | Data/ora stimata di arrivo finale |
 
 ### MovementTrackDestination
 Tabella: `a_movement_track_destination`
