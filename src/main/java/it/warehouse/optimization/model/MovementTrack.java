@@ -1,5 +1,6 @@
 package it.warehouse.optimization.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import it.warehouse.optimization.model.enumerator.MovementStatus;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -11,6 +12,7 @@ import javax.swing.text.Position;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 @Getter
@@ -18,7 +20,7 @@ import java.util.UUID;
 @AllArgsConstructor
 @NoArgsConstructor
 @Entity
-@Table(name = "movementtrack")
+@Table(name = "movement_track")
 
 public class MovementTrack  extends  AbstractAuditable{
 
@@ -37,6 +39,10 @@ public class MovementTrack  extends  AbstractAuditable{
     @Column(nullable = false)
     private Integer quantity;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private MovementStatus status;
+
     @Column(precision =  12)
     private BigDecimal estimatedTotalDurationMillis;
 
@@ -48,6 +54,10 @@ public class MovementTrack  extends  AbstractAuditable{
 
     @Column
     private String veicoloDaImplementare;
+
+    @JsonIgnore
+    @OneToMany(mappedBy = "movementTrack")
+    private List<MovementTrackDestination> destinations;
 
 
 }

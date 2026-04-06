@@ -6,6 +6,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Getter
@@ -13,12 +14,14 @@ import java.util.List;
 @AllArgsConstructor
 @NoArgsConstructor
 
-public class RouteInfo {
+public class SingleRouteInfo {
 
-    private BigDecimal distanceInMeters;
-    private BigDecimal timeInMillis;
-    private String geometry;
-    private List<String> instructions;
+    protected BigDecimal distanceInMeters;
+    protected BigDecimal timeInMillis;
+    protected String geometry;
+    protected LocalDateTime estimatedArrival;
+    protected List<String> instructions;
+   
 
 
 }

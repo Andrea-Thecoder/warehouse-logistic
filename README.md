@@ -56,6 +56,11 @@ python3 gh-map-downloader.py \
 
 Oltre ai valori per il caricamento delle mappe, è possibile modificare altri parametri dell’applicativo in `application.properties` usando valori generici da sostituire:
 ```
-warehouse.coordinates.validation.enabled=<true|false> warehouse.lat.min=<LAT_MIN> warehouse.lat.max=<LAT_MAX> warehouse.lon.min=<LON_MIN> warehouse.lon.max=<LON_MAX> warehouse.routing.language=<LANGUAGE_CODE>
+warehouse.coordinates.validation.enabled=<true|false> 
+warehouse.lat.min=<LAT_MIN> 
+warehouse.lat.max=<LAT_MAX> 
+warehouse.lon.min=<LON_MIN> 
+warehouse.lon.max=<LON_MAX> 
+warehouse.routing.language=<LANGUAGE_CODE>
 ```
 

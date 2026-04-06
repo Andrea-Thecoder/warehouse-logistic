@@ -41,14 +41,14 @@ public final class MovementSearchRequest extends  BaseSearchRequest{
             query.ilike("originWarehouse.name","%"+originWarehouseName.trim()+"%");
         }
         if(StringUtils.isNotBlank(destinationWarehouseName)){
-            query.ilike("destinationWarehouse.name","%"+destinationWarehouseName.trim()+"%");
+            query.ilike("destinations.name","%"+destinationWarehouseName.trim()+"%");
         }
 
         if(StringUtils.isNotBlank(originCity)){
             query.ilike("originWarehouse.city.name","%"+originCity.trim()+"%");
         }
         if(StringUtils.isNotBlank(destinationCity)){
-            query.ilike("destinationWarehouse.city.name","%"+destinationCity.trim()+"%");
+            query.ilike("destinations.city.name","%"+destinationCity.trim()+"%");
         }
 
         if(StringUtils.isNotBlank(productName)){
@@ -59,9 +59,9 @@ public final class MovementSearchRequest extends  BaseSearchRequest{
             String searchFormatted = "%"+search.trim()+"%";
             query.or()
                     .ilike("originWarehouse.name","%"+searchFormatted.trim()+"%")
-                    .ilike("destinationWarehouse.name","%"+searchFormatted.trim()+"%")
+                    .ilike("destinations.name","%"+searchFormatted.trim()+"%")
                     .ilike("originWarehouse.city.name","%"+searchFormatted.trim()+"%")
-                    .ilike("destinationWarehouse.city.name","%"+searchFormatted.trim()+"%")
+                    .ilike("destinations.city.name","%"+searchFormatted.trim()+"%")
                     .ilike("product.name","%"+searchFormatted.trim()+"%")
             .endOr();
         }

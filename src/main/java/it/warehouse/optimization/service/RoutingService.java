@@ -1,33 +1,38 @@
 package it.warehouse.optimization.service;
 
 
+import com.google.ortools.Loader;
 import com.google.ortools.constraintsolver.Assignment;
+import com.google.ortools.constraintsolver.FirstSolutionStrategy;
 import com.google.ortools.constraintsolver.RoutingIndexManager;
 import com.google.ortools.constraintsolver.RoutingModel;
+import com.google.ortools.constraintsolver.RoutingSearchParameters;
+import com.google.ortools.constraintsolver.main;
 import com.graphhopper.GHRequest;
 import com.graphhopper.GHResponse;
 import com.graphhopper.GraphHopper;
 import com.graphhopper.ResponsePath;
-import com.graphhopper.util.shapes.GHPoint;
 import it.warehouse.optimization.config.GraphHopperConfig;
-import it.warehouse.optimization.dto.movementdestination.InsertMovementDestinationDTO;
-import it.warehouse.optimization.dto.routing.RouteInfo;
+import it.warehouse.optimization.dto.routing.MultiRouteInfo;
+import it.warehouse.optimization.dto.routing.SingleRouteInfo;
+import it.warehouse.optimization.dto.warehouse.SimpleDetailWarehouseDTO;
 import it.warehouse.optimization.model.City;
 import it.warehouse.optimization.model.Warehouse;
 import it.warehouse.optimization.utils.RoutingUtils;
+import jakarta.annotation.PostConstruct;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 
 @ApplicationScoped
 @Slf4j
-
 public class RoutingService {
 
     @Inject
@@ -36,14 +41,18 @@ public class RoutingService {
     @Inject
     RoutingUtils routingUtils;
 
+    @PostConstruct
+    void init() {
+        Loader.loadNativeLibraries();
+    }
 
-    public RouteInfo calculateRoute(City originCity, City destinationCity) {
+
+    public SingleRouteInfo calculateRoute(City originCity, City destinationCity) {
         log.info("calculateRoute: Starting calculate route from city: {} to city: {}", originCity.getName(), destinationCity.getName());
         routingUtils.validateCoordinates(originCity);
         routingUtils.validateCoordinates(destinationCity);
 
         GraphHopper hopper = graphHopperConfig.getHopper();
-
 
         GHRequest request = new GHRequest(
                 originCity.getLatitude().doubleValue(),
@@ -63,107 +72,163 @@ public class RoutingService {
         return createRouteInfo(path);
     }
 
-    public RouteInfo calculateRoute2(City originCity, Set<Warehouse> warehouses) {
-        log.info("calculateRoute: Starting calculate route from city: {}", originCity.getName());
 
-        List<GHPoint> points = new ArrayList<>();
-
-        createPoints(originCity, warehouses, points);
-        final int n = points.size();
-        long[][] distanceMatrix = new long[n][n];
-        long[][] timeMatrix = new long[n][n];
+    public List<MultiRouteInfo> calculateMultiDropRoute(Warehouse originWarehouse, Set<Warehouse> warehouses) {
+        City originCity = originWarehouse.getCity();
+        log.info("calculateMultiDropRoute: {} destinations from warehouse {}", warehouses.size(), originWarehouse.getName());
 
         GraphHopper hopper = graphHopperConfig.getHopper();
+        routingUtils.validateCoordinates(originCity);
 
-        populateMatrix(distanceMatrix, timeMatrix, points, hopper);
+        List<Warehouse> warehouseList = new ArrayList<>(warehouses);
+        for (Warehouse wh : warehouseList) {
+            routingUtils.validateCoordinates(wh.getCity());
+        }
 
-        RoutingIndexManager manager = new RoutingIndexManager(n, 1, 0);
+        int n = warehouseList.size();
+
+        // Raccoglie coordinate: indice 0 = origine, 1..n = magazzini
+        double[] lats = new double[n + 1];
+        double[] lons = new double[n + 1];
+        lats[0] = originCity.getLatitude().doubleValue();
+        lons[0] = originCity.getLongitude().doubleValue();
+        for (int i = 0; i < n; i++) {
+            lats[i + 1] = warehouseList.get(i).getCity().getLatitude().doubleValue();
+            lons[i + 1] = warehouseList.get(i).getCity().getLongitude().doubleValue();
+        }
+
+        // Matrice Haversine N×N — zero chiamate esterne
+        long[][] distanceMatrix = buildHaversineMatrix(lats, lons, n + 1);
+
+        // OR-Tools TSP: trova l'ordine ottimale di visita
+        List<Integer> optimalOrder = solveWithOrTools(distanceMatrix, n);
+
+        // GraphHopper: N chiamate per geometria + istruzioni nell'ordine ottimale
+        List<MultiRouteInfo> routeInfos = new ArrayList<>();
+        double totalDistance = 0;
+        long totalTime = 0;
+        Date departure = new Date();
+
+        double currentLat = lats[0];
+        double currentLon = lons[0];
+        Warehouse previousWarehouse = originWarehouse;
+
+        for (int stopOrder = 1; stopOrder <= optimalOrder.size(); stopOrder++) {
+            int whIndex = optimalOrder.get(stopOrder - 1);
+            Warehouse nextWarehouse = warehouseList.get(whIndex);
+            double nextLat = lats[whIndex + 1];
+            double nextLon = lons[whIndex + 1];
+
+            GHRequest req = new GHRequest(currentLat, currentLon, nextLat, nextLon)
+                    .setProfile("car")
+                    .setLocale(Locale.forLanguageTag(routingUtils.getRoutingLanguage()));
+
+            GHResponse resp = hopper.route(req);
+            if (resp.hasErrors()) {
+                log.error("calculateMultiDropRoute: GraphHopper error at stop {}: {}", stopOrder, resp.getErrors());
+                throw new RuntimeException("Error routing leg " + stopOrder + ": " + resp.getErrors());
+            }
+
+            ResponsePath path = resp.getBest();
+            totalDistance += path.getDistance();
+            totalTime += path.getTime();
+
+            MultiRouteInfo ri = new MultiRouteInfo();
+            ri.setStopOrder(stopOrder);
+            ri.setFromWarehouse(SimpleDetailWarehouseDTO.of(previousWarehouse));
+            ri.setToWarehouse(SimpleDetailWarehouseDTO.of(nextWarehouse));
+            ri.setDistanceInMeters(BigDecimal.valueOf(path.getDistance()));
+            ri.setTimeInMillis(BigDecimal.valueOf(path.getTime()));
+            ri.setGeometry(routingUtils.toWkt(path.getPoints()));
+            ri.setInstructions(routingUtils.createInstructions(path.getInstructions()));
+            ri.setEstimatedArrival(RoutingUtils.calculateEstimatedArrival(departure, BigDecimal.valueOf(totalTime)));
+            routeInfos.add(ri);
+
+            currentLat = nextLat;
+            currentLon = nextLon;
+            previousWarehouse = nextWarehouse;
+        }
+
+        // Summary come primo elemento (stopOrder = 0)
+        if (!routeInfos.isEmpty()) {
+            MultiRouteInfo summary = new MultiRouteInfo();
+            summary.setStopOrder(0);
+            summary.setFromWarehouse(SimpleDetailWarehouseDTO.of(originWarehouse));
+            summary.setDistanceInMeters(BigDecimal.valueOf(totalDistance));
+            summary.setTimeInMillis(BigDecimal.valueOf(totalTime));
+            summary.setGeometry("TOTAL_SUMMARY");
+            routeInfos.addFirst(summary);
+        }
+
+        log.info("calculateMultiDropRoute: completed — total distance {} km", Math.round(totalDistance / 1000));
+        return routeInfos;
+    }
+
+
+    private long[][] buildHaversineMatrix(double[] lats, double[] lons, int size) {
+        long[][] matrix = new long[size][size];
+        for (int i = 0; i < size; i++) {
+            for (int j = 0; j < size; j++) {
+                matrix[i][j] = haversineMeters(lats[i], lons[i], lats[j], lons[j]);
+            }
+        }
+        return matrix;
+    }
+
+    private long haversineMeters(double lat1, double lon1, double lat2, double lon2) {
+        final double R = 6_371_000.0;
+        double dLat = Math.toRadians(lat2 - lat1);
+        double dLon = Math.toRadians(lon2 - lon1);
+        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
+                + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
+                * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return Math.round(R * c);
+    }
+
+    /**
+     * Risolve il TSP con OR-Tools e restituisce l'ordine ottimale degli indici dei magazzini.
+     * Il nodo 0 è il deposito (origine), i nodi 1..n sono i magazzini.
+     * L'output è una lista di indici 0-based riferiti alla lista dei magazzini.
+     */
+    private List<Integer> solveWithOrTools(long[][] distanceMatrix, int numWarehouses) {
+        int numNodes = numWarehouses + 1; // 0 = deposito
+        RoutingIndexManager manager = new RoutingIndexManager(numNodes, 1, 0);
         RoutingModel routing = new RoutingModel(manager);
 
-        routing.setArcCostEvaluatorOfAllVehicles((long fromIndex, long toIndex) -> {
-            int fromNode = manager.indexToNode(fromIndex);
-            int toNode = manager.indexToNode(toIndex);
+        final int transitCallbackIndex = routing.registerTransitCallback((long fromIndex, long toIndex) -> {
+            int fromNode = manager.indexToNode((int) fromIndex);
+            int toNode = manager.indexToNode((int) toIndex);
             return distanceMatrix[fromNode][toNode];
         });
+        routing.setArcCostEvaluatorOfAllVehicles(transitCallbackIndex);
 
-        Assignment solution = routing.solve();
-        if (solution == null) {
-            log.error("calculateMultiDropRoute: Unable to solve TSP");
-            throw new RuntimeException("Cannot solve TSP for multi-drop route.");
-        }
+        RoutingSearchParameters searchParameters = main.defaultRoutingSearchParameters()
+                .toBuilder()
+                .setFirstSolutionStrategy(FirstSolutionStrategy.Value.PATH_CHEAPEST_ARC)
+                .build();
 
-        List<RouteInfo> routeList = new ArrayList<>();
+        Assignment solution = routing.solveWithParameters(searchParameters);
+
+        List<Integer> optimalOrder = new ArrayList<>();
         long index = routing.start(0);
-        int stopOrder = 1;
-
-        long cumulativeTime = 0;
-        long cumulativeDistance = 0;
-
+        index = solution.value(routing.nextVar(index)); // salta il deposito
         while (!routing.isEnd(index)) {
-            int node = manager.indexToNode(index);
-            if (node != 0) { // skip origine
-                GHPoint point = points.get(node);
-
-                RouteInfo ri = new RouteInfo();
-                ri.setStopOrder(stopOrder++);
-                ri.setDistanceInMeters(BigDecimal.valueOf(distanceMatrix[0][node])); // distanza dall'origine o cumulativa
-                ri.setTimeInMillis(BigDecimal.valueOf(timeMatrix[0][node])); // tempo dall'origine
-                // stimiamo arrivo cumulativo
-                cumulativeTime += timeMatrix[0][node];
-                cumulativeDistance += distanceMatrix[0][node];
-                ri.setEstimatedArrival(routingUtils.calculateEstimatedArrival(/* startTime */ null, cumulativeTime));
-                ri.setGeometry(""); // puoi opzionale calcolare geometria se vuoi
-                routeList.add(ri);
-            }
+            int node = manager.indexToNode((int) index);
+            optimalOrder.add(node - 1); // node 1 → warehouse[0], ecc.
             index = solution.value(routing.nextVar(index));
         }
-
-        return null;
-
+        return optimalOrder;
     }
 
 
-    private void createPoints(City originCity, Set<Warehouse> warehouses, List<GHPoint> points) {
-        routingUtils.validateCoordinates(originCity);
-        points.add(new GHPoint(originCity.getLatitude().doubleValue(), originCity.getLongitude().doubleValue()));
-        for (Warehouse wh : warehouses) {
-            routingUtils.validateCoordinates(wh.getCity());
-            points.add(new GHPoint(wh.getCity().getLatitude().doubleValue(), wh.getCity().getLongitude().doubleValue()));
-        }
+    private SingleRouteInfo createRouteInfo(ResponsePath path) {
+        SingleRouteInfo singleRouteInfo = new SingleRouteInfo();
+        singleRouteInfo.setDistanceInMeters(BigDecimal.valueOf(path.getDistance()));
+        singleRouteInfo.setTimeInMillis(BigDecimal.valueOf(path.getTime()));
+        singleRouteInfo.setGeometry(routingUtils.toWkt(path.getPoints()));
+        singleRouteInfo.setInstructions(routingUtils.createInstructions(path.getInstructions()));
+        return singleRouteInfo;
     }
-
-    private void populateMatrix(long[][] distanceMatrix, long[][] timeMatrix, List<GHPoint> points, GraphHopper hopper) {
-        final int SIZE = points.size();
-        for (int i = 0; i < SIZE; i++) {
-            for (int j = 0; j < SIZE; j++) {
-                if (i == j) continue;
-
-                GHRequest req = new GHRequest(points.get(i), points.get(j))
-                        .setProfile("car")
-                        .setLocale(Locale.forLanguageTag(routingUtils.getRoutingLanguage()));
-
-                GHResponse resp = hopper.route(req);
-
-                if (resp.hasErrors()) {
-                    log.error("calculateRoute: Error while calculating route. Error message: {}", resp.getErrors());
-                    throw new RuntimeException("Error calculating route: " + resp.getErrors());
-                }
-
-                distanceMatrix[i][j] = Math.round(resp.getBest().getDistance());
-                timeMatrix[i][j] = resp.getBest().getTime();
-            }
-        }
-    }
-
-
-    private RouteInfo createRouteInfo(ResponsePath path) {
-        RouteInfo routeInfo = new RouteInfo();
-        routeInfo.setDistanceInMeters(BigDecimal.valueOf(path.getDistance()));
-        routeInfo.setTimeInMillis(BigDecimal.valueOf(path.getTime()));
-        routeInfo.setGeometry(routingUtils.toWkt(path.getPoints()));
-        routeInfo.setInstructions(routingUtils.createInstructions(path.getInstructions()));
-        return routeInfo;
-    }
-
 
 }
