@@ -11,10 +11,9 @@ public enum MovementStatus {
     OVER_RECEIVED,
     IN_TRANSIT,
     CANCELLED,
-    FROM_FACTORY,
     TO_SALE;
 
 
-    public static final EnumSet<MovementStatus> VALID_INSERT_STATUS = EnumSet.of(IN_TRANSIT,FROM_FACTORY,TO_SALE);
+    public static final EnumSet<MovementStatus> VALID_INSERT_STATUS = EnumSet.of(IN_TRANSIT,TO_SALE);
     public static final EnumSet<MovementStatus> VALID_RECEIVED_STATUS =  EnumSet.of(RECEIVED,PARTIALLY_RECEIVED,OVER_RECEIVED);
 }
