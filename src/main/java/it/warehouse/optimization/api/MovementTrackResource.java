@@ -2,6 +2,7 @@ package it.warehouse.optimization.api;
 
 
 import it.warehouse.optimization.dto.PagedResultDTO;
+import it.warehouse.optimization.dto.SimpleResultDTO;
 import it.warehouse.optimization.dto.movementtrack.BaseDetailMovementTrackDTO;
 import it.warehouse.optimization.dto.movementtrack.InsertMovementTrackDTO;
 import it.warehouse.optimization.dto.movementtrack.ReceivedMovementTrackDTO;
@@ -9,12 +10,7 @@ import it.warehouse.optimization.dto.search.MovementSearchRequest;
 import it.warehouse.optimization.service.MovementTrackService;
 import jakarta.inject.Inject;
 import jakarta.validation.Valid;
-import jakarta.ws.rs.BeanParam;
-import jakarta.ws.rs.GET;
-import jakarta.ws.rs.PATCH;
-import jakarta.ws.rs.POST;
-import jakarta.ws.rs.Path;
-import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.*;
 import lombok.extern.slf4j.Slf4j;
 import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
@@ -35,11 +31,14 @@ public class MovementTrackResource {
             summary = "Insert movement track.",
             description = "API for insert a new movement for a product"
     )
-    public UUID insertMovementTrack(
+    public SimpleResultDTO<UUID> insertMovementTrack(
             @Valid InsertMovementTrackDTO dto
             ){
         log.info("MovementTrackResource - insertMovementTrack");
-        return movementTrackService.handleMovementTrack(dto);
+        return SimpleResultDTO.<UUID>builder()
+                .payload(movementTrackService.handleMovementTrack(dto))
+                .message("Movement track created successfully.")
+                .build();
     }
 
     @PATCH
@@ -48,25 +47,32 @@ public class MovementTrackResource {
             summary = "Mark movement as received.",
             description = "Registers the reception of a movement at the destination warehouse and updates stock accordingly."
     )
-    public UUID receivedMovementTrack(
+    public SimpleResultDTO<UUID> receivedMovementTrack(
             @PathParam("movementTrackId") UUID movementTrackId,
             @Valid ReceivedMovementTrackDTO dto
     ) {
         log.info("MovementTrackResource - receivedMovementTrack");
-        return movementTrackService.handleStatusReceived(movementTrackId, dto);
+        return SimpleResultDTO.<UUID>builder()
+                .payload(movementTrackService.handleStatusReceived(movementTrackId, dto))
+                .message("Movement track received successfully.")
+                .build();
     }
 
     @PATCH
     @Path("/{movementTrackId}/cancelled")
     @Operation(
             summary = "Cancel a movement track.",
-            description = "Cancels an existing movement and compensates stock accordingly. Only applicable to IN_TRANSIT, FROM_FACTORY and TO_SALE statuses."
+            description = "Cancels an existing movement and compensates stock accordingly. Only applicable to IN_TRANSIT and TO_SALE statuses."
     )
-    public UUID cancelledMovementTrack(
-            @PathParam("movementTrackId") UUID movementTrackId
+    public SimpleResultDTO<Void> cancelledMovementTrack(
+            @PathParam("movementTrackId") UUID movementTrackId,
+            @QueryParam("notes") String notes
     ) {
         log.info("MovementTrackResource - cancelledMovementTrack");
-        return movementTrackService.handleStatusCancelled(movementTrackId);
+        movementTrackService.handleStatusCancelled(movementTrackId, notes);
+        return SimpleResultDTO.<Void>builder()
+                .message("Movement track cancelled successfully.")
+                .build();
     }
 
     @GET
