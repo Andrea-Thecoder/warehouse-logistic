@@ -21,7 +21,7 @@
         <commons-io.version>2.16.1</commons-io.version>
 
         <sonar.host.url>http://localhost:9000</sonar.host.url>
-        <sonar.projectKey>optaplanner-tester</sonar.projectKey>
+        <sonar.projectKey>warehouse-logistic</sonar.projectKey>
         <sonar.java.coveragePlugin>jacoco</sonar.java.coveragePlugin>
         <sonar.jacoco.reportPaths>${project.build.directory}/jacoco.exec</sonar.jacoco.reportPaths>
         <!--  <sonar.exclusions>**/JWTService.java,**/utils/**</sonar.exclusions>-->
